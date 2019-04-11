@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/streadway/amqp"
 )
 
@@ -19,6 +20,10 @@ type mychannel struct {
 var TempCh mychannel
 
 func init() {
+	err1 := godotenv.Load()
+	if err1 != nil {
+		log.Panic(err1)
+	}
 	conn, err := amqp.Dial(os.Getenv("rmq_uri"))
 	failOnError(err, "Failed to connect to RabbitMQ")
 	// defer conn.Close()
