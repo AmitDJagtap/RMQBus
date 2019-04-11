@@ -22,7 +22,7 @@ func setup(rmquri string) {
 	defer channel.Close()
 }
 
-func rpc(topic string, msg string) interface{} {
+func Rpc(topic string, msg string) interface{} {
 
 	q, err := channel.QueueDeclare(
 		"",    // name
@@ -73,7 +73,7 @@ func rpc(topic string, msg string) interface{} {
 	return res
 }
 
-func publish(topic string, msg string) {
+func Publish(topic string, msg string) {
 
 	temp := strings.Split(topic, ".")
 	exchange, rKey := temp[0], temp[1]
