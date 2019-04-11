@@ -12,7 +12,7 @@ import (
 var conn *amqp.Connection
 var channel *amqp.Channel
 
-func setup(rmquri string) {
+func Setup(rmquri string) {
 	conn, err := amqp.Dial(rmquri)
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
