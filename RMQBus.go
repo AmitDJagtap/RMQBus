@@ -4,27 +4,36 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"os"
 	"strings"
 
 	"github.com/streadway/amqp"
 )
 
-var conn *amqp.Connection
-var channel *amqp.Channel
+var ch *amqp.Channel
 
-func Setup(rmquri string) {
-	conn, err := amqp.Dial(rmquri)
-	failOnError(err, "Failed to connect to RabbitMQ")
-	defer conn.Close()
-
-	channel, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
-	defer channel.Close()
+type mychannel struct {
+	mych *amqp.Channel
 }
 
-func Rpc(topic string, msg string) interface{} {
+var TempCh mychannel
 
-	q, err := channel.QueueDeclare(
+func init() {
+	conn, err := amqp.Dial(os.Getenv("rmq_uri"))
+	failOnError(err, "Failed to connect to RabbitMQ")
+	// defer conn.Close()
+
+	ch, err := conn.Channel()
+	failOnError(err, "Failed to open a channel")
+	// defer ch.Close()
+
+	TempCh = mychannel{mych: ch}
+
+}
+
+func (TempCh *mychannel) Rpc(topic string, msg string) interface{} {
+
+	q, err := TempCh.mych.QueueDeclare(
 		"",    // name
 		false, // durable
 		false, // delete when unused
@@ -34,7 +43,7 @@ func Rpc(topic string, msg string) interface{} {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	msgs, err := channel.Consume(
+	msgs, err := TempCh.mych.Consume(
 		q.Name, // queue
 		"",     // consumer
 		true,   // auto-ack
@@ -47,7 +56,7 @@ func Rpc(topic string, msg string) interface{} {
 
 	corrId := randomString(32)
 
-	err = channel.Publish(
+	err = TempCh.mych.Publish(
 		"",    // exchange
 		topic, // routing key
 		false, // mandatory
@@ -73,12 +82,12 @@ func Rpc(topic string, msg string) interface{} {
 	return res
 }
 
-func Publish(topic string, msg string) {
+func (TempCh *mychannel) Publish(topic string, msg string) {
 
 	temp := strings.Split(topic, ".")
 	exchange, rKey := temp[0], temp[1]
 
-	err := channel.Publish(
+	err := TempCh.mych.Publish(
 		exchange, // exchange
 		rKey,     // routing key
 		false,    // mandatory
