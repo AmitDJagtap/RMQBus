@@ -6,39 +6,47 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/joho/godotenv"
 	"github.com/streadway/amqp"
 )
 
-var ch *amqp.Channel
-
-type mychannel struct {
-	mych *amqp.Channel
+type RMQ struct {
+	Ch   *amqp.Channel
+	Conn *amqp.Connection
 }
 
-var TempCh mychannel
+var singleton *RMQ
+var once sync.Once
+
+func GetChannel() *RMQ {
+	once.Do(func() {
+
+		conn, err := amqp.Dial(os.Getenv("rmq_uri"))
+		failOnError(err, "Failed to connect to RabbitMQ")
+
+		ch, err := conn.Channel()
+		failOnError(err, "Failed to open a channel")
+
+		singleton = &RMQ{Ch: ch, Conn: conn}
+	})
+	return singleton
+}
 
 func init() {
 	err1 := godotenv.Load()
 	if err1 != nil {
 		log.Panic(err1)
 	}
-	conn, err := amqp.Dial(os.Getenv("rmq_uri"))
-	failOnError(err, "Failed to connect to RabbitMQ")
-	// defer conn.Close()
-
-	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
-	// defer ch.Close()
-
-	TempCh = mychannel{mych: ch}
-
 }
 
-func (TempCh *mychannel) Rpc(topic string, msg string) interface{} {
+func (RMQ *RMQ) Rpc(topic string, msg string) interface{} {
 
-	q, err := TempCh.mych.QueueDeclare(
+	ch, err := RMQ.Conn.Channel()
+	failOnError(err, "Failed to open a channel")
+
+	q, err := ch.QueueDeclare(
 		"",    // name
 		false, // durable
 		false, // delete when unused
@@ -48,7 +56,7 @@ func (TempCh *mychannel) Rpc(topic string, msg string) interface{} {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	msgs, err := TempCh.mych.Consume(
+	msgs, err := ch.Consume(
 		q.Name, // queue
 		"",     // consumer
 		true,   // auto-ack
@@ -61,7 +69,7 @@ func (TempCh *mychannel) Rpc(topic string, msg string) interface{} {
 
 	corrId := randomString(32)
 
-	err = TempCh.mych.Publish(
+	err = ch.Publish(
 		"",    // exchange
 		topic, // routing key
 		false, // mandatory
@@ -87,12 +95,15 @@ func (TempCh *mychannel) Rpc(topic string, msg string) interface{} {
 	return res
 }
 
-func (TempCh *mychannel) Publish(topic string, msg string) {
+func (RMQ *RMQ) Publish(topic string, msg string) {
 
 	temp := strings.Split(topic, ".")
 	exchange, rKey := temp[0], temp[1]
 
-	err := TempCh.mych.Publish(
+	ch, err := RMQ.Conn.Channel()
+	failOnError(err, "Failed to open a channel")
+
+	err = ch.Publish(
 		exchange, // exchange
 		rKey,     // routing key
 		false,    // mandatory
