@@ -20,7 +20,7 @@ type RMQ struct {
 var singleton *RMQ
 var once sync.Once
 
-func GetChannel() *RMQ {
+func GetConnection() *RMQ {
 	once.Do(func() {
 
 		conn, err := amqp.Dial(os.Getenv("rmq_uri"))
