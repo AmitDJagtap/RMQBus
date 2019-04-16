@@ -35,10 +35,14 @@ func GetConnection() *RMQ {
 }
 
 func init() {
-	err1 := godotenv.Load()
-	if err1 != nil {
-		log.Panic(err1)
+	value := os.Getenv("app")
+	if len(value) == 0 {
+		err1 := godotenv.Load()
+		if err1 != nil {
+			log.Panic(err1)
+		}
 	}
+
 }
 
 func (RMQ *RMQ) Rpc(topic string, msg string) interface{} {
